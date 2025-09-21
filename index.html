@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My DevOps Learning Journey</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+        }
+
+        .status {
+            background-color: #2ecc71;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1> My DevOps Learning Journey</h1>
+        
+        <div class="status" id="status">
+            Website is working! Ready to deploy to AWS S3 📡
+        </div>
+
+        <h2>What I'm Learning</h2>
+        <div class="learning-item">
+            <strong> AWS S3 Buckets:</strong> Learning how to store files in the cloud and host static websites
+        </div>
+        
+        <div class="learning-item">
+            <strong> Terraform:</strong> Infrastructure as Code - creating cloud resources with code instead of clicking
+        </div>
+        
+        <div class="learning-item">
+            <strong> Static Websites:</strong> Simple websites using HTML, CSS, and JavaScript
+        </div>
+
+        <h2>My Learning Goals</h2>
+        <ul>
+            <li> Create a simple static website (this one!)</li>
+            <li> Test it locally on my computer</li>
+            <li> Upload it to AWS S3 bucket</li>
+            <li> Learn Terraform to automate everything</li>
+            <li> Set up CloudFront CDN</li>
+            <li> Become a DevOps</li>
+        </ul>
+
+        <h2>Current Status</h2>
+        <p>I'm just starting my DevOps journey. This website is my first step into learning cloud infrastructure, AWS services, and automation tools.</p>
+        
+        <button onclick="updateProgress()">Mark Progress ✨</button>
+        
+        <div class="footer">
+            <p>Last updated: <span id="date"></span></p>
+            <p>Deployed with: Learning in progress... 📚</p>
+        </div>
+    </div>
+
+    <script>
+        // Simple JavaScript to show the current date
+        document.getElementById('date').textContent = new Date().toLocaleDateString();
+        
+        // Simple function to show progress
+        function updateProgress() {
+            document.getElementById('status').textContent = "Great job! Keep learning! 🎉";
+            document.getElementById('status').style.backgroundColor = "#e74c3c";
+        }
+    </script>
+</body>
+</html>
