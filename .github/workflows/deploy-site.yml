@@ -1,0 +1,37 @@
+name: Deploy static site to S3
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tf-workloads/site-content/**'   # only run when site content changes
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write    # required for OIDC
+      contents: read
+
+    steps:
+      - name: Checkout   # pulls the repo into the VM so later steps can see tf-workloads/site-content/
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4 # 1.request OIDC token from github. 2.Calls AWS STS AssumeRoleWithWebIdentity with that token to assume IAM role. 3.Exports temporary AWS creds as env vars
+        with:
+          role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole 
+          aws-region: eu-central-1
+
+      - name: Who am I? (debug)
+        run: aws sts get-caller-identity # prints which identity the AWS CLI is using
+
+      - name: Sync site to S3
+        run: |
+          aws s3 sync ./tf-workloads/site-content s3://my-terraform.example.com --delete  # Copies new/changed files to your S3 bucket.--delete removes objects in the bucket that no longer exist in your folder
+      - name: Invalidate CloudFront cache (optional)
+        env:
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        if: env.DIST_ID != ''
+        run: |
+          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
