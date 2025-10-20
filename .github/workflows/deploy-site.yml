@@ -14,7 +14,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout   # pulls the repo into the VM so later steps can see tf-workloads/site-content/
+      - name: Checkout   # pulls the repo into the VM 
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials (OIDC)
@@ -23,13 +23,10 @@ jobs:
           role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole 
           aws-region: eu-central-1
 
-      - name: Who am I? (debug)
-        run: aws sts get-caller-identity # prints which identity the AWS CLI is using
-
       - name: Sync site to S3
         run: |
           aws s3 sync ./tf-workloads/site-content s3://my-terraform.example.com --delete  # Copies new/changed files to your S3 bucket.--delete removes objects in the bucket that no longer exist in your folder
-      - name: Invalidate CloudFront cache (optional)
+      - name: Invalidate CloudFront cache 
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         if: env.DIST_ID != ''
