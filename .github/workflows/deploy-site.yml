@@ -6,8 +6,8 @@ on:
   push:                                   # Trigger this workflow when code is pushed
     branches: [ main ]                    # Only on the 'main' branch
     paths:
-      - 'tf-workloads/site-content/**'    # Only when the website content folder changes
-
+      - './site-content/**'    # Only when the website content folder changes
+      - '.github/workflows/deploy-site.yml' # ALSO run when this workflow changes
 jobs:
   deploy:                                 
     runs-on: ubuntu-latest                # Use GitHub-hosted Ubuntu runner (virtual machine)
@@ -32,19 +32,15 @@ jobs:
           role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole  # IAM Role for GitHub
           aws-region: eu-central-1          
 
-      # ------------------------------------------------------------
       # STEP 3 — Upload the site to a release folder named after the commit SHA
       # This keeps a full copy for each version so i can roll back later.
-      # ------------------------------------------------------------
       - name: Upload to release prefix
         run: |
-          aws s3 sync ./tf-workloads/site-content s3://$S3_BUCKET/releases/${{ github.sha }}/ --delete
+          aws s3 sync ./site-content s3://$S3_BUCKET/releases/${{ github.sha }}/ --delete
 
-      # ------------------------------------------------------------
       # STEP 4 — Copy (promote) HTML files from the release folder to the bucket root
       # This makes the latest version live.
       # "no-cache" so browsers don't keep showing old HTML.
-      # ------------------------------------------------------------
       - name: Promote HTML to root (short/no cache)
         run: |
           aws s3 cp s3://$S3_BUCKET/releases/${{ github.sha }}/ s3://$S3_BUCKET/ \
@@ -52,30 +48,16 @@ jobs:
             --metadata-directive REPLACE \
             --cache-control "no-cache, no-store, must-revalidate"
 
-      # ------------------------------------------------------------
-      # STEP 5 — Copy all other assets to the root
-      # ------------------------------------------------------------
-      - name: Promote assets to root (long cache)
-        run: |
-          aws s3 cp s3://$S3_BUCKET/releases/${{ github.sha }}/ s3://$S3_BUCKET/ \
-            --recursive --exclude "*.html" \
-            --metadata-directive REPLACE \
-            --cache-control "public, max-age=31536000, immutable"
-
-      # ------------------------------------------------------------
       # STEP 6 — Save a small text file showing which version (commit SHA) is currently live
       # Example content of current.txt: 7d92a2d3e7b1234
-      # ------------------------------------------------------------
       - name: Write current.txt
         run: |
           echo "${{ github.sha }}" > current.txt
           aws s3 cp current.txt s3://$S3_BUCKET/current.txt
 
-      # ------------------------------------------------------------
       # STEP 7 — Invalidate CloudFront cache 
       # This makes CloudFront fetch the newest version of the files immediately.
       # It prevents users from seeing cached old content.
-      # ------------------------------------------------------------
       - name: Invalidate CloudFront cache 
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}  # CloudFront Distribution ID (from secrets)
