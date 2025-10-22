@@ -1,34 +1,87 @@
-name: Deploy static site to S3
+# This workflow automatically deploys my static website to S3 when push to main
+
+name: Deploy static site to S3 (include versioning)
 
 on:
-  push:
-    branches: [ main ]
+  push:                                   # Trigger this workflow when code is pushed
+    branches: [ main ]                    # Only on the 'main' branch
     paths:
-      - 'tf-workloads/site-content/**'   # only run when site content changes
+      - 'tf-workloads/site-content/**'    # Only when the website content folder changes
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  deploy:                                 
+    runs-on: ubuntu-latest                # Use GitHub-hosted Ubuntu runner (virtual machine)
     permissions:
-      id-token: write    # required for OIDC
-      contents: read
+      id-token: write                     # Needed for OpenID Connect (to assume AWS role)
+      contents: read                      # Needed to read the repository contents
+
+    env:
+      S3_BUCKET: my-terraform.example.com # S3 bucket name 
 
     steps:
-      - name: Checkout   # pulls the repo into the VM 
-        uses: actions/checkout@v4
+      # STEP 1 — Checkout the repository files into the runner
+      - name: Checkout repository
+        uses: actions/checkout@v4         # Downloads the repo so next steps can access it
 
+  
+      # STEP 2 — Authenticate to AWS using OIDC (no static secrets)
+      
       - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4 # 1.request OIDC token from github. 2.Calls AWS STS AssumeRoleWithWebIdentity with that token to assume IAM role. 3.Exports temporary AWS creds as env vars
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole 
-          aws-region: eu-central-1
+          role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole  # IAM Role for GitHub
+          aws-region: eu-central-1          
 
-      - name: Sync site to S3
+      # ------------------------------------------------------------
+      # STEP 3 — Upload the site to a release folder named after the commit SHA
+      # This keeps a full copy for each version so i can roll back later.
+      # ------------------------------------------------------------
+      - name: Upload to release prefix
         run: |
-          aws s3 sync ./tf-workloads/site-content s3://my-terraform.example.com --delete  # Copies new/changed files to your S3 bucket.--delete removes objects in the bucket that no longer exist in your folder
+          aws s3 sync ./tf-workloads/site-content s3://$S3_BUCKET/releases/${{ github.sha }}/ --delete
+
+      # ------------------------------------------------------------
+      # STEP 4 — Copy (promote) HTML files from the release folder to the bucket root
+      # This makes the latest version live.
+      # "no-cache" so browsers don't keep showing old HTML.
+      # ------------------------------------------------------------
+      - name: Promote HTML to root (short/no cache)
+        run: |
+          aws s3 cp s3://$S3_BUCKET/releases/${{ github.sha }}/ s3://$S3_BUCKET/ \
+            --recursive --exclude "*" --include "*.html" \
+            --metadata-directive REPLACE \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+      # ------------------------------------------------------------
+      # STEP 5 — Copy all other assets to the root
+      # ------------------------------------------------------------
+      - name: Promote assets to root (long cache)
+        run: |
+          aws s3 cp s3://$S3_BUCKET/releases/${{ github.sha }}/ s3://$S3_BUCKET/ \
+            --recursive --exclude "*.html" \
+            --metadata-directive REPLACE \
+            --cache-control "public, max-age=31536000, immutable"
+
+      # ------------------------------------------------------------
+      # STEP 6 — Save a small text file showing which version (commit SHA) is currently live
+      # Example content of current.txt: 7d92a2d3e7b1234
+      # ------------------------------------------------------------
+      - name: Write current.txt
+        run: |
+          echo "${{ github.sha }}" > current.txt
+          aws s3 cp current.txt s3://$S3_BUCKET/current.txt
+
+      # ------------------------------------------------------------
+      # STEP 7 — Invalidate CloudFront cache 
+      # This makes CloudFront fetch the newest version of the files immediately.
+      # It prevents users from seeing cached old content.
+      # ------------------------------------------------------------
       - name: Invalidate CloudFront cache 
         env:
-          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        if: env.DIST_ID != ''
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}  # CloudFront Distribution ID (from secrets)
+        if: env.DIST_ID != ''                                 # Only run if it's set
         run: |
-          aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*"
+

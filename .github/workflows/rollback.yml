@@ -1,0 +1,55 @@
+# Manual rollback workflow — lets you revert to any previous version instantly
+name: Roll back static site to a previous SHA
+
+on:
+  workflow_dispatch:                       # run this workflow manually from GitHub Actions UI
+    inputs:
+      sha:                                 # Input parameter (type this in GitHub Actions when ill run it)
+        description: "Commit SHA to roll back to (must exist under releases/)"
+        required: true                     # must supply a SHA when i start the workflow
+        type: string                       # The value will be text (the commit hash)
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest                 # Runs the job on a GitHub-hosted Ubuntu runner (VM)
+    permissions:
+      id-token: write                      # Allows GitHub to get an OpenID token to assume your AWS IAM role
+      contents: read                       # Lets the job read the repo content 
+    env:
+      S3_BUCKET: my-terraform.example.com  # Environment variable for S3 bucket name
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4          # Pulls the repo into the runner 
+
+      - name: Configure AWS credentials (OIDC) # GitHub requests a temporary OIDC token → AWS verifies it → GitHub runner gets short-lived credentials to access S3 and CloudFront
+        uses: aws-actions/configure-aws-credentials@v4  # Authenticates to AWS via IAM role
+        with:
+          role-to-assume: arn:aws:iam::586549103923:role/GithubOidcDeployRole  # The role with S3 + CloudFront
+          aws-region: eu-central-1         
+
+      # Copy HTML use "no-cache" headers so browsers and CloudFront always fetch the fresh HTML version — not a cached one
+      - name: Promote HTML (short/no cache)
+        run: |
+          aws s3 cp s3://$S3_BUCKET/releases/${{ inputs.sha }}/ s3://$S3_BUCKET/ \  # Copy files from the chosen release folder to bucket root
+            --recursive --exclude "*" --include "*.html" \                           # Only HTML files
+            --metadata-directive REPLACE \                                           # Replace metadata (so Cache-Control applies)
+            --cache-control "no-cache, no-store, must-revalidate"                    # Force browsers to fetch fresh HTML
+
+
+      # Update current.txt- this acts as a marker showing which release is currently live
+      - name: Update current.txt
+        run: |
+          echo "${{ inputs.sha }}" > current.txt                                    # Write the rollback SHA into a file
+          aws s3 cp current.txt s3://$S3_BUCKET/current.txt                         # Upload it to bucket root so you know which version is live
+
+      # CloudFront invalidation - this ensures users immediately see the reverted version — not old cached content
+      - name: Invalidate CloudFront cache
+        env:
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} # Reads your CloudFront Distribution ID from repo secrets
+        if: env.DIST_ID != ''                                # Only runs if you actually have a distribution configured
+        run: |
+          aws cloudfront create-invalidation \                # Tells CloudFront to clear its cached files
+            --distribution-id "$DIST_ID" \                    # Distribution to refresh
+            --paths "/*"                                      # Invalidate everything so new content is shown
+

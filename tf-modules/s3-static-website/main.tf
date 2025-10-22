@@ -103,3 +103,37 @@ resource "aws_s3_bucket_policy" "this" {
   ]
 }
 
+
+# Lifecycle policy for old releases cleanup
+resource "aws_s3_bucket_lifecycle_configuration" "this" {
+  bucket = aws_s3_bucket.this.id
+
+  # Rule 1: Delete old releases after 90 days
+  rule {
+    id     = "delete-old-releases"
+    status = "Enabled"
+
+    filter {
+      prefix = "releases/"
+    }
+
+    expiration {
+      days = 90
+    }
+  }
+
+  # Rule 2: Archive old versions to cheaper storage
+  rule {
+    id     = "archive-old-versions"
+    status = "Enabled"
+
+    noncurrent_version_transition {
+      days          = 30
+      storage_class = "STANDARD_IA"
+    }
+
+    noncurrent_version_expiration {
+      days = 90
+    }
+  }
+}
