@@ -44,10 +44,10 @@ jobs:
       - name: Promote HTML to root (short/no cache)
         run: |
           aws s3 cp s3://$S3_BUCKET/releases/${{ github.sha }}/ s3://$S3_BUCKET/ \
-            --recursive --exclude "*" --include "*.html" \  # copy anything inside folder ending with .html
-            --metadata-directive REPLACE \     # tells S3 overwrite metadata in the destination file
-            --content-type "text/html; charset=utf-8" \ # tells that this object is HTML text
-            --cache-control "no-cache, no-store, must-revalidate" # revalidate before using a cached,don’t keep it permanently,check with the origin
+            --recursive --exclude "*" --include "*.html" \  
+            --metadata-directive REPLACE \     
+            --content-type "text/html; charset=utf-8" \ 
+            --cache-control "no-cache, no-store, must-revalidate" 
 
       # STEP 6 — Save a small text file showing which version (commit SHA) is currently live
       # Example content of current.txt: 7d92a2d3e7b1234
