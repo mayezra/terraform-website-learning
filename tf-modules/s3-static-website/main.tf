@@ -129,7 +129,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
 
     noncurrent_version_transition {
       days          = 30
-      storage_class = "STANDARD_IA"
+      storage_class = "STANDARD_IA" # Infrequent Access. Still in S3, still instantly readable, just cheaper
     }
 
     noncurrent_version_expiration {
