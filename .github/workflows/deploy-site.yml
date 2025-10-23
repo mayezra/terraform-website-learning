@@ -8,6 +8,8 @@ on:
     paths:
       - './site-content/**'    # Only when the website content folder changes
       - '.github/workflows/deploy-site.yml' # ALSO run when this workflow changes
+  workflow_dispatch: {}                     # allow manual runs from Actions tab
+
 jobs:
   deploy:                                 
     runs-on: ubuntu-latest                # Use GitHub-hosted Ubuntu runner (virtual machine)
