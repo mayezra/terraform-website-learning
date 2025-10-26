@@ -6,8 +6,8 @@ on:
   push:                                   # Trigger this workflow when code is pushed
     branches: [ main ]                    # Only on the 'main' branch
     paths:
-      - './site-content/**'    # Only when the website content folder changes
-      - '.github/workflows/deploy-site.yml' # ALSO run when this workflow changes
+      - '/site-content/**'    # Only when the website content folder changes
+      - '.github/workflows/deploy-site.yml' # also run when this workflow changes
   workflow_dispatch: {}                     # allow manual runs from Actions tab
 
 jobs:
