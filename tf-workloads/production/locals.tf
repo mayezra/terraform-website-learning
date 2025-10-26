@@ -1,13 +1,13 @@
 locals {
-  # Add environment prefix
-  bucket_name = var.site_domain
+  environment = "production"
 
-  # Useful tags that can be reused
+  bucket_name = var.site_domain
   common_tags = {
-    Project     = "terraform-website-learning"
-    Owner       = "mayezra"
-    Environment = "production"
+    Project     = var.project_name
+    Owner       = var.owner
+    Environment = local.environment
     ManagedBy   = "terraform"
+    Workload    = "static-website"
   }
 
   # Calculate full CloudFront domain

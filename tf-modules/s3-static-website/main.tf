@@ -31,7 +31,7 @@ resource "aws_s3_bucket_ownership_controls" "this" {
 
 # Allow CloudFront to sign requests to S3 (modern OAC mechanism)- CloudFront uses an Origin Access Control to sign requests.
 resource "aws_cloudfront_origin_access_control" "this" {
-  name                              = "${var.bucket_name}-oac" # readable name
+  name                              = local.oac_name # readable name
   origin_access_control_origin_type = "s3"                     # origin is S3
   signing_behavior                  = "always"                 # always sign requests
   signing_protocol                  = "sigv4"                  # AWS Signature v4
@@ -43,17 +43,17 @@ resource "aws_cloudfront_distribution" "this" {
   default_root_object = "index.html" # serve index.html by default
 
   origin {                                                                    # where CloudFront fetches content
-    domain_name              = aws_s3_bucket.this.bucket_regional_domain_name # S3 origin DNS
-    origin_id                = "s3-origin"                                    # internal ID
+    domain_name              = local.bucket_regional_domain # S3 origin DNS
+    origin_id                = local.origin_id                                   # internal ID
     origin_access_control_id = aws_cloudfront_origin_access_control.this.id   # tie to OAC above
     s3_origin_config { origin_access_identity = "" }                          # required empty field when using OAC
   }
 
   default_cache_behavior {
-    target_origin_id       = "s3-origin"         # reference the origin block
+    target_origin_id       = local.origin_id         # reference the origin block
     viewer_protocol_policy = "redirect-to-https" # force HTTPS for users
-    allowed_methods        = ["GET", "HEAD"]     # static site: read only
-    cached_methods         = ["GET", "HEAD"]     # cache read methods
+    allowed_methods        = local.allowed_methods     # static site: read only
+    cached_methods         = local.cached_methods     # cache read methods
     compress               = true                # enable gzip/brotli compression
 
     forwarded_values {
@@ -78,7 +78,7 @@ data "aws_iam_policy_document" "allow_cf" {
   statement {
     effect    = "Allow"
     actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.this.arn}/*"]
+    resources = ["${local.bucket_arn}/*"]
     principals {
       type        = "Service"
       identifiers = ["cloudfront.amazonaws.com"]
@@ -117,13 +117,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
 
     # Move noncurrent versions to cheaper storage after 30 days
     noncurrent_version_transition {
-      noncurrent_days = 30
+      noncurrent_days = local.noncurrent_glacier_days
       storage_class   = "GLACIER_IR" # Instant retrieval the files can be fetched immediately.
     }
 
     # Permanently remove noncurrent versions after 90 days
     noncurrent_version_expiration {
-      noncurrent_days = 90
+      noncurrent_days = local.noncurrent_expiry_days
     }
   }
 
@@ -137,7 +137,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "this" {
     }
 
     expiration {
-      days = 100 # delete release objects older than 100 days
+      days =  local.release_expiry_days  # delete release objects older than 100 days
     }
   }
 }
